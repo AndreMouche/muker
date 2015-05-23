@@ -1,5 +1,9 @@
 package proto
 
+import (
+	"github.com/openinx/muker/utils"
+)
+
 func Uint32ToBytes(v uint32) []byte {
 	b := make([]byte, 4)
 	b[0] = byte(v)
@@ -9,14 +13,38 @@ func Uint32ToBytes(v uint32) []byte {
 	return b
 }
 
+type Packet struct {
+	Length uint32
+	SeqId  uint8
+	Body   []byte
+}
+
+func NewPacket(seqId uint8, body []byte) *Packet {
+	p := new(Packet)
+	p.Length = uint32(len(body))
+	p.SeqId = seqId
+	p.Body = body
+	return p
+}
+
+func (p Packet) ToBytes() []byte {
+	var buf []byte
+	buf = utils.AppendBuf(buf, utils.Uint24ToBytes(p.Length))
+	buf = utils.AppendBuf(buf, utils.Uint8ToBytes(p.SeqId))
+	buf = utils.AppendBuf(buf, p.Body)
+	return buf
+}
+
 func HandShake() []byte {
 	var buf []byte
+
+	buf = append(buf)
 
 	//protocal version
 	buf = append(buf, 0x0a)
 
 	// server-version
-	buf = append(buf, []byte("Muker -- MySQL Proxy")...)
+	buf = append(buf, []byte("muker-mysql-proxy-1.0")...)
 	buf = append(buf, 0x00)
 
 	// ConnectionID
@@ -39,7 +67,60 @@ func HandShake() []byte {
 	buf = append(buf, 0x00)
 	buf = append(buf, 0x02)
 
-	//
+	// Unused bytes 13bytes
+	unused := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	buf = append(buf, unused[:]...)
 
-	return buf
+	// auth-plugin-data-part-2
+	for i := 0; i < 13; i++ {
+		buf = append(buf, 0x00)
+	}
+	return NewPacket(0, buf).ToBytes()
+
+}
+
+func OK() []byte {
+	var buf []byte
+
+	//header
+	buf = append(buf, 0x00)
+
+	// affected rows
+	buf = append(buf, 0x00)
+	buf = append(buf, 0x00)
+
+	//last_insert_id
+	buf = append(buf, 0x00)
+	buf = append(buf, 0x00)
+
+	//server status
+	buf = append(buf, 0x00)
+	buf = append(buf, 0x02)
+
+	//warning
+	buf = append(buf, 0x00)
+	buf = append(buf, 0x00)
+
+	return NewPacket(2, buf).ToBytes()
+}
+
+func ERR() []byte {
+	var buf []byte
+
+	//header
+	buf = append(buf, 0xff)
+
+	//error code
+	buf = append(buf, 034)
+	buf = append(buf, 012)
+
+	//
+	buf = append(buf, []byte("Internal error found")...)
+
+	return NewPacket(2, buf).ToBytes()
+}
+
+func Quit() []byte {
+	buf := []byte{1}
+	return NewPacket(0, buf).ToBytes()
 }
