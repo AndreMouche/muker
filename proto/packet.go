@@ -72,6 +72,7 @@ func (p Packet) ToBytes() []byte {
 
 func HandShake() []byte {
 	var buf []byte
+	sequenceId := uint8(0)
 
 	buf = append(buf)
 
@@ -110,11 +111,11 @@ func HandShake() []byte {
 	for i := 0; i < 13; i++ {
 		buf = append(buf, 0x00)
 	}
-	return NewPacket(0, buf).ToBytes()
+	return NewPacket(sequenceId, buf).ToBytes()
 
 }
 
-func OK() []byte {
+func OK(sequenceId uint8) []byte {
 	var buf []byte
 
 	//header
@@ -136,11 +137,12 @@ func OK() []byte {
 	buf = append(buf, 0x00)
 	buf = append(buf, 0x00)
 
-	return NewPacket(2, buf).ToBytes()
+	return NewPacket(sequenceId, buf).ToBytes()
 }
 
 func ERR() []byte {
 	var buf []byte
+	sequenceId := uint8(0)
 
 	//header
 	buf = append(buf, 0xff)
@@ -152,7 +154,7 @@ func ERR() []byte {
 	//
 	buf = append(buf, []byte("Internal error found")...)
 
-	return NewPacket(2, buf).ToBytes()
+	return NewPacket(sequenceId, buf).ToBytes()
 }
 
 func Quit() []byte {

@@ -42,13 +42,13 @@ func handleClient(c net.Conn) {
 
 	// auth mysql-client
 	for {
-		_, err := readPacket(c)
+		p, err := readPacket(c)
 		fmt.Printf("auth: mysql-client\n")
 		if err == io.EOF {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 		break
 	}
 
@@ -74,19 +74,19 @@ func handleCommand(c net.Conn, p *proto.Packet) {
 	comType := p.Body[0]
 	if comType == proto.ComSleep {
 	} else if comType == proto.ComQuit {
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 	} else if comType == proto.ComQuery {
 		fmt.Printf("Query Command: %s\n", string(p.Body[1:]))
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 	} else if comType == proto.ComPing {
 		fmt.Printf("Command Ping\n")
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 	} else if comType == proto.ComInitDB {
 		schemaName := string(p.Body[1:])
 		fmt.Printf("Command Init DB: %s\n", schemaName)
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 	} else if comType == proto.ComCreateDB {
-		c.Write(proto.OK())
+		c.Write(proto.OK(p.SeqId + 1))
 	}
 }
 
