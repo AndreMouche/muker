@@ -1,4 +1,4 @@
-all: build test
+all: build 
 
 build:
 	go build -o ./bin/muker ./cmd/muker.go
@@ -10,5 +10,3 @@ run: build start
 
 start:
 	./bin/muker
-
-
