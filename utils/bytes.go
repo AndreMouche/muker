@@ -119,3 +119,17 @@ func LenEncodeToInt(buf []byte) (uint64, error) {
 	}
 	return v, nil
 }
+
+func CalcLenForLenEncode(buf []byte) (int, error) {
+	if buf[0] < 0xfb {
+		return 1, nil
+	} else if buf[0] == 0xfc {
+		return 3, nil
+	} else if buf[0] == 0xfd {
+		return 4, nil
+	} else if buf[0] == 0xfe {
+		return 9, nil
+	} else {
+		return 0, fmt.Errorf("CalcLenForLenEncode failed. %x", buf)
+	}
+}

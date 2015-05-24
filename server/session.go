@@ -135,17 +135,24 @@ func (s *Session) DoCommand() {
 			fmt.Printf("Command: Quit\n")
 			s.Conn.Close()
 		case proto.ComInitDB:
-			fmt.Printf("Command: InitDB\n")
+			s.doComInitDB(p)
 		case proto.ComQuery:
 			s.doComQuery(p)
 		case proto.ComFieldList:
-			fmt.Printf("Command: FieldList\n")
+			s.doComFieldList()
 		case proto.ComCreateDB:
-			fmt.Printf("Command: CreateDB\n")
+			s.doComCreateDB()
 		case proto.ComDropDB:
-			fmt.Printf("Command: DropDB\n")
+			s.doComDropDB()
 		}
 	}
+}
+
+func (s *Session) doComInitDB(p *proto.Packet) {
+	schema := p.Buf[1:]
+	fmt.Printf("Command InitDB: %s\n", schema)
+	pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
+	s.Conn.Write(pktBuf)
 }
 
 func (s *Session) doComQuery(p *proto.Packet) {
@@ -153,4 +160,16 @@ func (s *Session) doComQuery(p *proto.Packet) {
 	fmt.Printf("Command Query: %s\n", query)
 	pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
 	s.Conn.Write(pktBuf)
+}
+
+func (s *Session) doComFieldList() {
+	fmt.Printf("Command: ComFieldList.\n")
+}
+
+func (s *Session) doComCreateDB() {
+	fmt.Printf("Command: CreateDB\n")
+}
+
+func (s *Session) doComDropDB() {
+	fmt.Printf("Command: DropDB\n")
 }

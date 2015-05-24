@@ -330,3 +330,78 @@ func (p *CommandPacket) Read(buf []byte) error {
 func (p *CommandPacket) Len() int {
 	return 1 + len(p.query)
 }
+
+type ColumnDefPacket struct {
+}
+
+func (p *ColumnDefPacket) Write(sequenceId uint8) ([]byte, error) {
+}
+
+func (p *ColumnDefPacket) Read(buf []byte) error {
+}
+
+func (p *ColumnDefPacket) Len() int {
+}
+
+type ResultSetRowPacket struct {
+	fieldCount int
+	fields     []string
+}
+
+func DefaultResultSetRowPacket(fieldCount int) *ResultSetRowPacket {
+	return &ResultSetRowPacket{
+		fieldCount: fieldCount,
+		fields:     make([]string, fieldCount),
+	}
+}
+
+func (p *ResultSetRowPacket) Write(sequenceId uint8) ([]byte, error) {
+}
+
+func (p *ResultSetRowPacket) Read(buf []byte) error {
+	// NULL is return
+	if buf[0] == 0xfb {
+		p.fieldCount = 0
+		p.fields = nil
+		return nil
+	}
+	fieldIdx := 0
+	idx := 0
+	bufLen := len(buf)
+	for {
+		if iLen, err := utils.LenEncodeToInt(buf[idx:]); err != nil {
+			return err
+		}
+		if calcBytes, err2 := uilts.CalcLenForLenEncode(buf[idx:]); err != nil {
+			return err
+		}
+		idx += calcBytes
+		if idx+iLen > bufLen {
+			return fmt.Errorf("ResultSetRowPacket read overflow: bufLen: %d, readIndex: %d", bufLen, idx+iLen)
+		}
+		fields[fieldIdx] = string(buf[idx : idx+iLen])
+		idx += iLen
+		fieldIdx++
+		if fields == fieldIdx {
+			if idx != bufLen {
+				return fmt.Errorf("ResultSetRowPacket unfinished bytes.")
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (p *ResultSetRowPacket) Len() int {
+	if p.fieldCount == 0 {
+		return 1
+	}
+	ret := 0
+	for i := 0; i < p.fieldCount; i++ {
+		if strLen, err := utils.IntToLenEncode(len(p.fields[i])); err != nil {
+			return 0
+		}
+		ret += strLen
+	}
+	return ret
+}
