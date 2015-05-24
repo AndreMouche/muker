@@ -4,6 +4,41 @@ import (
 	"github.com/openinx/muker/utils"
 )
 
+const (
+	ComSleep            = 0x00
+	ComQuit             = 0x01
+	ComInitDB           = 0x02
+	ComQuery            = 0x03
+	ComFieldList        = 0x04
+	ComCreateDB         = 0x05
+	ComDropDB           = 0x06
+	ComRefresh          = 0x07
+	ComShutdown         = 0x08
+	ComStatistics       = 0x09
+	ComProcessInfo      = 0x0a
+	ComConnect          = 0x0b
+	ComProcessKill      = 0x0c
+	ComDebug            = 0x0d
+	ComPing             = 0x0e
+	ComTime             = 0x0f
+	ComDelayedInsert    = 0x10
+	ComChangeUser       = 0x11
+	ComBinlogDump       = 0x12
+	ComTableDump        = 0x13
+	ComConnectOut       = 0x14
+	ComRegisterSlave    = 0x15
+	ComStmtPrepare      = 0x16
+	ComStmtExecute      = 0x17
+	ComStmtSendLongData = 0x18
+	ComStmtClose        = 0x19
+	ComStmtReset        = 0x1a
+	ComSetOption        = 0x1b
+	ComStmtFetch        = 0x1c
+	ComDaemon           = 0x1d
+	ComBinlogDumpGtid   = 0x1e
+	ComResetConnection  = 0x1f
+)
+
 func Uint32ToBytes(v uint32) []byte {
 	b := make([]byte, 4)
 	b[0] = byte(v)

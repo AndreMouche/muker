@@ -36,26 +36,58 @@ func Start() {
 
 func handleClient(c net.Conn) {
 	fmt.Printf("RemoteAddr: %s\n", c.RemoteAddr().String())
+
+	// send server information
 	c.Write(proto.HandShake())
 
+	// auth mysql-client
+	for {
+		_, err := readPacket(c)
+		fmt.Printf("auth: mysql-client\n")
+		if err == io.EOF {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		c.Write(proto.OK())
+		break
+	}
+
+	// command phrase
 	for {
 		p, err := readPacket(c)
 		if err == io.EOF {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		if err != nil && err != io.EOF {
+
+		if err != nil {
 			fmt.Printf(err.Error() + "\n")
 			c.Close()
 			return
 		}
-		handlePacket(c, p)
+		handleCommand(c, p)
 	}
 }
 
-func handlePacket(c net.Conn, p *proto.Packet) {
-	fmt.Printf("send to client packet : %x\n", p.ToBytes())
-	c.Write(proto.OK())
+func handleCommand(c net.Conn, p *proto.Packet) {
+	fmt.Printf("recv client packet : %x\n", p.ToBytes())
+	comType := p.Body[0]
+	if comType == proto.ComSleep {
+	} else if comType == proto.ComQuit {
+		c.Write(proto.OK())
+	} else if comType == proto.ComQuery {
+		fmt.Printf("Query Command: %s\n", string(p.Body[1:]))
+		c.Write(proto.OK())
+	} else if comType == proto.ComPing {
+		fmt.Printf("Command Ping\n")
+		c.Write(proto.OK())
+	} else if comType == proto.ComInitDB {
+		schemaName := string(p.Body[1:])
+		fmt.Printf("Command Init DB: %s\n", schemaName)
+		c.Write(proto.OK())
+	} else if comType == proto.ComCreateDB {
+		c.Write(proto.OK())
+	}
 }
 
 func readPacket(c net.Conn) (*proto.Packet, error) {
