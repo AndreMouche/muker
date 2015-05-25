@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"fmt"
 	"github.com/openinx/muker/utils"
 )
 
@@ -335,12 +336,15 @@ type ColumnDefPacket struct {
 }
 
 func (p *ColumnDefPacket) Write(sequenceId uint8) ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (p *ColumnDefPacket) Read(buf []byte) error {
+	return nil
 }
 
 func (p *ColumnDefPacket) Len() int {
+	return 0
 }
 
 type ResultSetRowPacket struct {
@@ -356,6 +360,7 @@ func DefaultResultSetRowPacket(fieldCount int) *ResultSetRowPacket {
 }
 
 func (p *ResultSetRowPacket) Write(sequenceId uint8) ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (p *ResultSetRowPacket) Read(buf []byte) error {
@@ -366,23 +371,25 @@ func (p *ResultSetRowPacket) Read(buf []byte) error {
 		return nil
 	}
 	fieldIdx := 0
-	idx := 0
-	bufLen := len(buf)
+	idx := uint64(0)
+	bufLen := uint64(len(buf))
 	for {
-		if iLen, err := utils.LenEncodeToInt(buf[idx:]); err != nil {
+		iLen, err := utils.LenEncodeToInt(buf[idx:])
+		if err != nil {
 			return err
 		}
-		if calcBytes, err2 := uilts.CalcLenForLenEncode(buf[idx:]); err != nil {
-			return err
+		calcBytes, err2 := utils.CalcLenForLenEncode(buf[idx:])
+		if err2 != nil {
+			return err2
 		}
 		idx += calcBytes
 		if idx+iLen > bufLen {
 			return fmt.Errorf("ResultSetRowPacket read overflow: bufLen: %d, readIndex: %d", bufLen, idx+iLen)
 		}
-		fields[fieldIdx] = string(buf[idx : idx+iLen])
+		p.fields[fieldIdx] = string(buf[idx : idx+iLen])
 		idx += iLen
 		fieldIdx++
-		if fields == fieldIdx {
+		if len(p.fields) == fieldIdx {
 			if idx != bufLen {
 				return fmt.Errorf("ResultSetRowPacket unfinished bytes.")
 			}
@@ -398,10 +405,11 @@ func (p *ResultSetRowPacket) Len() int {
 	}
 	ret := 0
 	for i := 0; i < p.fieldCount; i++ {
-		if strLen, err := utils.IntToLenEncode(len(p.fields[i])); err != nil {
+		strLen, err := utils.CalcLenForLenEncode([]byte(p.fields[i]))
+		if err != nil {
 			return 0
 		}
-		ret += strLen
+		ret += int(strLen)
 	}
 	return ret
 }

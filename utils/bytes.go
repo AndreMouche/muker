@@ -120,7 +120,7 @@ func LenEncodeToInt(buf []byte) (uint64, error) {
 	return v, nil
 }
 
-func CalcLenForLenEncode(buf []byte) (int, error) {
+func CalcLenForLenEncode(buf []byte) (uint64, error) {
 	if buf[0] < 0xfb {
 		return 1, nil
 	} else if buf[0] == 0xfc {
