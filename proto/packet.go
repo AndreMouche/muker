@@ -333,6 +333,19 @@ func (p *CommandPacket) Len() int {
 }
 
 type ColumnDefPacket struct {
+	catalog      string // lenenc-string
+	schema       string // lenenc-string
+	table        string // lenenc-string
+	orgTable     string // lenenc-string
+	name         string // lenenc-string
+	orgName      string // lenenc-string
+	nextLength   int    // lenenc-int
+	characterSet []byte // 2 byte
+	columnLen    []byte // 4 byte
+	columnType   byte
+	flags        []byte // 2 byte
+	decimals     byte   // 1 byte
+	filler       []byte // 2 byte
 }
 
 func (p *ColumnDefPacket) Write(sequenceId uint8) ([]byte, error) {
@@ -340,6 +353,59 @@ func (p *ColumnDefPacket) Write(sequenceId uint8) ([]byte, error) {
 }
 
 func (p *ColumnDefPacket) Read(buf []byte) error {
+	var vlen uint64
+	var blen uint64
+	var err error
+
+	idx := 0
+	readString := func() (string, error) {
+		ulen, err = utils.LenEncodeToInt(buf)
+		if err != nil {
+			return err
+		}
+		blen, err = utils.CalcLenForLenEncode(buf)
+		if err != nil {
+			return err
+		}
+		idx += blen
+		if idx+ulen > len(buf) {
+			return fmt.Errorf("Read Buffer overflow")
+		}
+		str := buf[idx : idx+ulen]
+		idx += ulen
+		return str
+	}
+
+	p.catalog, err = readString()
+	if err != nil {
+		return err
+	}
+
+	p.schema, err = readString()
+	if err != nil {
+		return err
+	}
+
+	p.table, err = readString()
+	if err != nil {
+		return err
+	}
+
+	p.orgTable, err = readString()
+	if err != nil {
+		return err
+	}
+
+	p.name, err = readString()
+	if err != nil {
+		return err
+	}
+
+	p.orgName, err = readString()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
