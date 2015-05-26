@@ -353,27 +353,27 @@ func (p *ColumnDefPacket) Write(sequenceId uint8) ([]byte, error) {
 }
 
 func (p *ColumnDefPacket) Read(buf []byte) error {
-	var vlen uint64
+	var ulen uint64
 	var blen uint64
 	var err error
 
-	idx := 0
+	idx := uint64(0)
 	readString := func() (string, error) {
 		ulen, err = utils.LenEncodeToInt(buf)
 		if err != nil {
-			return err
+			return "", err
 		}
 		blen, err = utils.CalcLenForLenEncode(buf)
 		if err != nil {
-			return err
+			return "", err
 		}
 		idx += blen
-		if idx+ulen > len(buf) {
-			return fmt.Errorf("Read Buffer overflow")
+		if idx+ulen > uint64(len(buf)) {
+			return "", fmt.Errorf("Read Buffer overflow")
 		}
-		str := buf[idx : idx+ulen]
+		str := string(buf[idx : idx+ulen])
 		idx += ulen
-		return str
+		return str, nil
 	}
 
 	p.catalog, err = readString()

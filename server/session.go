@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/openinx/muker/mysql"
 	"github.com/openinx/muker/proto"
 	"github.com/openinx/muker/utils"
 	"io"
@@ -101,7 +102,6 @@ func (s *Session) HandleClient() {
 
 func (s *Session) DoCommand() {
 
-	defer s.Conn.Close()
 	for {
 		p, err := s.readPacket()
 
@@ -133,7 +133,6 @@ func (s *Session) DoCommand() {
 		switch comType {
 		case proto.ComQuit:
 			fmt.Printf("Command: Quit\n")
-			s.Conn.Close()
 		case proto.ComInitDB:
 			s.doComInitDB(p)
 		case proto.ComQuery:
@@ -158,8 +157,18 @@ func (s *Session) doComInitDB(p *proto.Packet) {
 func (s *Session) doComQuery(p *proto.Packet) {
 	query := p.Buf[1:]
 	fmt.Printf("Command Query: %s\n", query)
-	pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
-	s.Conn.Write(pktBuf)
+
+	c, err := mysql.NewClient()
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+	}
+
+	fmt.Printf("Connect to backend Client Sucessful.\n")
+
+	err2 := c.WriteCommandPacket(p, s.Conn)
+	if err2 != nil {
+		fmt.Printf("Error: %s\n", err2.Error())
+	}
 }
 
 func (s *Session) doComFieldList() {
