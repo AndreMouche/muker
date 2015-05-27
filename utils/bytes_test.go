@@ -6,7 +6,7 @@ import (
 
 func TestIntToLenEncode(t *testing.T) {
 	// 9223372036854775807 = 1^63 - 1
-	arr := []int64{0, 250, 2333, 100000, 2342342342342, 234213345, 9223372036854775807}
+	arr := []uint64{0, 250, 2333, 100000, 2342342342342, 234213345, 9223372036854775807}
 	for _, a := range arr {
 		buf, err := IntToLenEncode(a)
 		if err != nil || len(buf) == 0 {
