@@ -40,7 +40,7 @@ func (s *Session) readPacket() (*proto.Packet, error) {
 		return nil, errors.New("Read packet header error : less than 4 bytes")
 	}
 
-	fmt.Printf("Read header: %x\n", header)
+	fmt.Printf("== Read header: %x\n", header)
 
 	pktLen := utils.BytesToUint24(header[:3])
 	sequenceId := utils.BytesToUint8(header[3:])
@@ -136,16 +136,17 @@ func (s *Session) DoCommand() {
 		switch comType {
 		case proto.ComQuit:
 			s.doComQuit(p)
+			return
 		case proto.ComInitDB:
 			s.doComInitDB(p)
 		case proto.ComQuery:
 			s.doComQuery(p)
 		case proto.ComFieldList:
-			s.doComFieldList()
+			s.doComFieldList(p)
 		case proto.ComCreateDB:
-			s.doComCreateDB()
+			s.doComCreateDB(p)
 		case proto.ComDropDB:
-			s.doComDropDB()
+			s.doComDropDB(p)
 		}
 		fmt.Printf("DoCommand Finished.\n")
 	}
@@ -153,20 +154,33 @@ func (s *Session) DoCommand() {
 
 // To fix issue: https://github.com/openinx/muker/issues/1
 func (s *Session) doComQuit(p *proto.Packet) {
-	fmt.Printf("Command Quit")
+	fmt.Printf("Command Quit\n")
 	s.Conn.Close()
 }
 
 func (s *Session) doComInitDB(p *proto.Packet) {
-	schema := p.Buf[1:]
-	fmt.Printf("Command InitDB: %s\n", schema)
-	pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
-	s.Conn.Write(pktBuf)
+	s.doInnerCommand("InitDB", p)
 }
 
 func (s *Session) doComQuery(p *proto.Packet) {
+	s.doInnerCommand("Query", p)
+}
+
+func (s *Session) doComFieldList(p *proto.Packet) {
+	s.doInnerCommand("ComFieldList", p)
+}
+
+func (s *Session) doComCreateDB(p *proto.Packet) {
+	s.doInnerCommand("CreateDB", p)
+}
+
+func (s *Session) doComDropDB(p *proto.Packet) {
+	s.doInnerCommand("DropDB", p)
+}
+
+func (s *Session) doInnerCommand(comName string, p *proto.Packet) {
 	query := p.Buf[1:]
-	fmt.Printf("Command Query: %s\n", query)
+	fmt.Printf("Command %s: %s\n", comName, query)
 
 	c, err := s.Backends.Get()
 	if err != nil {
@@ -187,17 +201,5 @@ func (s *Session) doComQuery(p *proto.Packet) {
 	if err2 != nil {
 		fmt.Printf("Error: %s\n", err2.Error())
 	}
-	fmt.Printf("doComQuery end.\n")
-}
-
-func (s *Session) doComFieldList() {
-	fmt.Printf("Command: ComFieldList.\n")
-}
-
-func (s *Session) doComCreateDB() {
-	fmt.Printf("Command: CreateDB\n")
-}
-
-func (s *Session) doComDropDB() {
-	fmt.Printf("Command: DropDB\n")
+	fmt.Printf("do command %s end.\n", comName)
 }
