@@ -3,7 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/openinx/muker/mysql"
+	"github.com/openinx/muker/pools"
 	"github.com/openinx/muker/proto"
 	"github.com/openinx/muker/utils"
 	"io"
@@ -15,13 +15,15 @@ type Session struct {
 	Conn       net.Conn
 	ConnId     uint32
 	SequenceId uint8
+	Backends   *pools.ConnPool
 }
 
-func NewSession(c net.Conn, connId uint32, sequenceId uint8) *Session {
+func NewSession(c net.Conn, connId uint32, sequenceId uint8, backends *pools.ConnPool) *Session {
 	return &Session{
 		Conn:       c,
 		ConnId:     connId,
 		SequenceId: sequenceId,
+		Backends:   backends,
 	}
 }
 
@@ -160,15 +162,20 @@ func (s *Session) doComQuery(p *proto.Packet) {
 	query := p.Buf[1:]
 	fmt.Printf("Command Query: %s\n", query)
 
-	c, err := mysql.NewClient()
+	c, err := s.Backends.Get()
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
+		fmt.Printf("Get Conn Error: %s\n", err.Error())
 	}
 
-	fmt.Printf("Connect to backend Client Sucessful.\n")
+	// reuse conn, put back to backend connection pool.
+	defer func() {
+		err = s.Backends.Put(c)
+		if err != nil {
+			fmt.Printf("Put back to conn pool failed: %v", err)
+		}
+	}()
 
-	//pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
-	//s.Conn.Write(pktBuf)
+	fmt.Printf("Connect to backend Client Sucessful.\n")
 
 	err2 := c.WriteCommandPacket(p, s.Conn)
 	if err2 != nil {

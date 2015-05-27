@@ -6,5 +6,11 @@ import (
 
 func main() {
 	proxySrv := server.DefaultProxyServer()
+
+	// Close Proxy Backend Connection
+	defer func() {
+		proxySrv.Close()
+	}()
+
 	proxySrv.Start()
 }

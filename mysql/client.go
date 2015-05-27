@@ -99,3 +99,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 
 	return nil
 }
+
+func (c *Client) Close() error {
+	return c.mc.Close()
+}
