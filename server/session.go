@@ -135,7 +135,7 @@ func (s *Session) DoCommand() {
 
 		switch comType {
 		case proto.ComQuit:
-			fmt.Printf("Command: Quit\n")
+			s.doComQuit(p)
 		case proto.ComInitDB:
 			s.doComInitDB(p)
 		case proto.ComQuery:
@@ -149,6 +149,12 @@ func (s *Session) DoCommand() {
 		}
 		fmt.Printf("DoCommand Finished.\n")
 	}
+}
+
+// To fix issue: https://github.com/openinx/muker/issues/1
+func (s *Session) doComQuit(p *proto.Packet) {
+	fmt.Printf("Command Quit")
+	s.Conn.Close()
 }
 
 func (s *Session) doComInitDB(p *proto.Packet) {
