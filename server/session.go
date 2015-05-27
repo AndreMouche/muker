@@ -125,6 +125,7 @@ func (s *Session) DoCommand() {
 
 		// Command does not supported
 		if !ok || !supported {
+			fmt.Printf("Command Type is Not Supported")
 			pBuf, _ = proto.DefaultErrorPacket("Command Not Supported").Write(s.SequenceId)
 			s.Conn.Write(pBuf)
 			continue
@@ -144,6 +145,7 @@ func (s *Session) DoCommand() {
 		case proto.ComDropDB:
 			s.doComDropDB()
 		}
+		fmt.Printf("DoCommand Finished.\n")
 	}
 }
 
@@ -165,10 +167,14 @@ func (s *Session) doComQuery(p *proto.Packet) {
 
 	fmt.Printf("Connect to backend Client Sucessful.\n")
 
+	//pktBuf, _ := proto.DefaultOkPacket().Write(s.SequenceId)
+	//s.Conn.Write(pktBuf)
+
 	err2 := c.WriteCommandPacket(p, s.Conn)
 	if err2 != nil {
 		fmt.Printf("Error: %s\n", err2.Error())
 	}
+	fmt.Printf("doComQuery end.\n")
 }
 
 func (s *Session) doComFieldList() {

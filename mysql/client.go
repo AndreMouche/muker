@@ -3,7 +3,8 @@ package mysql
 import (
 	"fmt"
 	"github.com/openinx/muker/proto"
-	"io"
+	"github.com/openinx/muker/utils"
+	"net"
 )
 
 type Client struct {
@@ -21,21 +22,38 @@ func NewClient() (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) WriteCommandPacket(cmd *proto.Packet, w io.Writer) error {
+func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 	err := c.mc.writeCommandPacketStr(cmd.Buf[0], string(cmd.Buf[1:]))
 	if err != nil {
 		return err
 	}
 	var data []byte
+	var n int
+	var err2 error
 
-	for {
-		data, err = c.mc.readPacket()
-		if err != nil {
-			fmt.Printf("Error: %s\n", err.Error())
-			return err
-		}
-		fmt.Printf("recv data <-- backend: %x\n", data)
-		n, err2 := w.Write(data)
+	// Column Length
+	data, err = c.mc.readFullPacket()
+
+	if err != nil {
+		return err
+	}
+
+	n, err2 = conn.Write(data)
+	fmt.Printf("write data to front: %x\n", data)
+	if err2 != nil {
+		return err2
+	}
+
+	columns, err3 := utils.LenEncodeToInt(data[4:])
+	if err3 != nil {
+		return err3
+	}
+
+	// Column Definition
+	for i := uint64(0); i < columns; i++ {
+		data, err = c.mc.readFullPacket()
+		n, err2 = conn.Write(data)
+		fmt.Printf("write data to front: %x\n", data)
 		if err2 != nil {
 			return err2
 		}
@@ -43,4 +61,41 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, w io.Writer) error {
 			return fmt.Errorf("Write data error.")
 		}
 	}
+
+	// Column Definition EOF
+	data, err = c.mc.readFullPacket()
+
+	if err != nil {
+		return err
+	}
+
+	n, err2 = conn.Write(data)
+	fmt.Printf("write data to front: %x\n", data)
+	if err2 != nil {
+		return err2
+	}
+
+	// Column Rows
+	for {
+		data, err = c.mc.readFullPacket()
+		if err != nil {
+			return err
+		}
+		n, err = conn.Write(data)
+		fmt.Printf("write data to front: %x\n", data)
+		if err != nil {
+			return err
+		}
+
+		if n != len(data) {
+			return fmt.Errorf("Write data error.")
+		}
+
+		if data[4] == 0xfe && len(data) == 4+5 {
+			fmt.Printf("EOF packet\n")
+			return nil
+		}
+	}
+
+	return nil
 }

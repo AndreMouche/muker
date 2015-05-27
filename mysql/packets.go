@@ -76,6 +76,62 @@ func (mc *mysqlConn) readPacket() ([]byte, error) {
 	}
 }
 
+func (mc *mysqlConn) readFullPacket() ([]byte, error) {
+	var payload []byte
+	for {
+		// Read packet header
+		data, err := mc.buf.readNext(4)
+		if err != nil {
+			errLog.Print(err)
+			mc.Close()
+			return nil, driver.ErrBadConn
+		}
+
+		// Packet Length [24 bit]
+		pktLen := int(uint32(data[0]) | uint32(data[1])<<8 | uint32(data[2])<<16)
+
+		if pktLen < 1 {
+			errLog.Print(ErrMalformPkt)
+			mc.Close()
+			return nil, driver.ErrBadConn
+		}
+
+		// Check Packet Sync [8 bit]
+		if data[3] != mc.sequence {
+			if data[3] > mc.sequence {
+				return nil, ErrPktSyncMul
+			} else {
+				return nil, ErrPktSync
+			}
+		}
+
+		payload = append(payload, data...)
+
+		mc.sequence++
+
+		// Read packet body [pktLen bytes]
+		data, err = mc.buf.readNext(pktLen)
+		if err != nil {
+			errLog.Print(err)
+			mc.Close()
+			return nil, driver.ErrBadConn
+		}
+
+		isLastPacket := (pktLen < maxPacketSize)
+
+		// Zero allocations for non-splitting packets
+		if isLastPacket && payload == nil {
+			return data, nil
+		}
+
+		payload = append(payload, data...)
+
+		if isLastPacket {
+			return payload, nil
+		}
+	}
+}
+
 // Write packet buffer 'data'
 func (mc *mysqlConn) writePacket(data []byte) error {
 	pktLen := len(data) - 4
