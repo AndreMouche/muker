@@ -116,7 +116,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 			return err
 		}
 		n, err = conn.Write(data)
-		fmt.Printf("write data to front: %x\n", data)
+		fmt.Printf("write data to front[Column ROW Packet]: %x\n", data)
 		if err != nil {
 			return err
 		}

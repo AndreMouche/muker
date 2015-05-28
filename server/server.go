@@ -18,7 +18,7 @@ type ProxyServer struct {
 func DefaultProxyServer() *ProxyServer {
 
 	// Initialize 50 conn pools
-	backends, err := pools.NewConnPool(1)
+	backends, err := pools.NewConnPool(50)
 	if err != nil {
 		fmt.Printf("open backend connection pool failed: %v", err)
 	}
