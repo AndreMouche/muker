@@ -38,8 +38,42 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 		return err
 	}
 
+	fmt.Printf("read data from backend: %x\n", data)
+
+	// Handle OK Packet, Error Packet, LoadInFile Packet.
+	switch data[4] {
+
+	// send OK Packet to client
+	case iOK:
+		fmt.Printf("write data to front[OK Packet]: %x\n", data)
+		n, err2 = conn.Write(data)
+		if err2 != nil {
+			return err2
+		}
+		if n != len(data) {
+			return fmt.Errorf("send data len is not equals.")
+		}
+		return nil
+
+	//send Err Packet to client
+	case iERR:
+		fmt.Printf("write data to front[ERR Packet]: %x\n", data)
+		n, err2 = conn.Write(data)
+		if err2 != nil {
+			return err2
+		}
+		if n != len(data) {
+			return fmt.Errorf("send data len is not equals.")
+		}
+		return nil
+
+	case iLocalInFile:
+		return fmt.Errorf("Not support LoadInFile yet.")
+	}
+
+	//following are Column Packet.
 	n, err2 = conn.Write(data)
-	fmt.Printf("write data to front: %x\n", data)
+	fmt.Printf("write data to front[Column Length Packet]: %x\n", data)
 	if err2 != nil {
 		return err2
 	}
@@ -53,24 +87,24 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 	for i := uint64(0); i < columns; i++ {
 		data, err = c.mc.readFullPacket()
 		n, err2 = conn.Write(data)
-		fmt.Printf("write data to front: %x\n", data)
+		fmt.Printf("write data to front[Column Definition Packet]: %x\n", data)
 		if err2 != nil {
 			return err2
 		}
 		if n != len(data) {
 			return fmt.Errorf("Write data error.")
 		}
+		// EOF Packet
+		if data[4] == iEOF && (n == 9 || n == 5) {
+			return nil
+		}
 	}
 
 	// Column Definition EOF
 	data, err = c.mc.readFullPacket()
 
-	if err != nil {
-		return err
-	}
-
 	n, err2 = conn.Write(data)
-	fmt.Printf("write data to front: %x\n", data)
+	fmt.Printf("write data to front[Column Definition EOF]: %x\n", data)
 	if err2 != nil {
 		return err2
 	}
@@ -82,7 +116,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 			return err
 		}
 		n, err = conn.Write(data)
-		fmt.Printf("write data to front: %x\n", data)
+		fmt.Printf("write data to front[Column ROW Packet]: %x\n", data)
 		if err != nil {
 			return err
 		}
@@ -90,9 +124,8 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 		if n != len(data) {
 			return fmt.Errorf("Write data error.")
 		}
-
-		if data[4] == 0xfe && len(data) == 4+5 {
-			fmt.Printf("EOF packet\n")
+		// EOF Packet
+		if data[4] == iEOF && (n == 9 || n == 5) {
 			return nil
 		}
 	}
