@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"github.com/AndreMouche/logging"
 	"github.com/openinx/muker/proto"
 	"github.com/openinx/muker/utils"
 	"net"
@@ -38,14 +39,14 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 		return err
 	}
 
-	fmt.Printf("read data from backend: %x\n", data)
+	logging.Debugf("read data from backend: %x", data)
 
 	// Handle OK Packet, Error Packet, LoadInFile Packet.
 	switch data[4] {
 
 	// send OK Packet to client
 	case iOK:
-		fmt.Printf("write data to front[OK Packet]: %x\n", data)
+		logging.Debugf("write data to front[OK Packet]: %x", data)
 		n, err2 = conn.Write(data)
 		if err2 != nil {
 			return err2
@@ -57,7 +58,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 
 	//send Err Packet to client
 	case iERR:
-		fmt.Printf("write data to front[ERR Packet]: %x\n", data)
+		logging.Debugf("write data to front[ERR Packet]: %x", data)
 		n, err2 = conn.Write(data)
 		if err2 != nil {
 			return err2
@@ -73,7 +74,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 
 	//following are Column Packet.
 	n, err2 = conn.Write(data)
-	fmt.Printf("write data to front[Column Length Packet]: %x\n", data)
+	logging.Debugf("write data to front[Column Length Packet]: %x", data)
 	if err2 != nil {
 		return err2
 	}
@@ -87,7 +88,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 	for i := uint64(0); i < columns; i++ {
 		data, err = c.mc.readFullPacket()
 		n, err2 = conn.Write(data)
-		fmt.Printf("write data to front[Column Definition Packet]: %x\n", data)
+		logging.Debugf("write data to front[Column Definition Packet]: %x", data)
 		if err2 != nil {
 			return err2
 		}
@@ -104,7 +105,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 	data, err = c.mc.readFullPacket()
 
 	n, err2 = conn.Write(data)
-	fmt.Printf("write data to front[Column Definition EOF]: %x\n", data)
+	logging.Debugf("write data to front[Column Definition EOF]: %x", data)
 	if err2 != nil {
 		return err2
 	}
@@ -116,7 +117,7 @@ func (c *Client) WriteCommandPacket(cmd *proto.Packet, conn net.Conn) error {
 			return err
 		}
 		n, err = conn.Write(data)
-		fmt.Printf("write data to front[Column ROW Packet]: %x\n", data)
+		logging.Debugf("write data to front[Column ROW Packet]: %x", data)
 		if err != nil {
 			return err
 		}

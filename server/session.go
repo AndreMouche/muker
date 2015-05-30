@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/AndreMouche/logging"
 	"github.com/openinx/muker/pools"
 	"github.com/openinx/muker/proto"
 	"github.com/openinx/muker/utils"
@@ -16,6 +17,7 @@ type Session struct {
 	ConnId     uint32
 	SequenceId uint8
 	Backends   *pools.ConnPool
+	SessionId  string
 }
 
 func NewSession(c net.Conn, connId uint32, sequenceId uint8, backends *pools.ConnPool) *Session {
@@ -24,6 +26,7 @@ func NewSession(c net.Conn, connId uint32, sequenceId uint8, backends *pools.Con
 		ConnId:     connId,
 		SequenceId: sequenceId,
 		Backends:   backends,
+		SessionId:  fmt.Sprintf("session_%v_%v", time.Now().Unix(), connId),
 	}
 }
 
@@ -36,16 +39,16 @@ func (s *Session) readPacket() (*proto.Packet, error) {
 	}
 
 	if n != 4 {
-		fmt.Printf("header length: %d\n", n)
+		logging.Error(s.SessionId, "header length:", n)
 		return nil, errors.New("Read packet header error : less than 4 bytes")
 	}
 
-	fmt.Printf("== Read header: %x\n", header)
+	logging.Debugf("%v == Read header: %x", s.SessionId, header)
 
 	pktLen := utils.BytesToUint24(header[:3])
 	sequenceId := utils.BytesToUint8(header[3:])
 
-	fmt.Printf("Read PacketLength: %d\n", pktLen)
+	logging.Debug(s.SessionId, "Read PacketLength:", pktLen)
 
 	body := make([]byte, pktLen)
 	n, err = s.Conn.Read(body)
@@ -65,20 +68,21 @@ func (s *Session) HandleClient() {
 	var err error
 	var written int
 
-	fmt.Printf("RemoteAddr: %s\n", s.Conn.RemoteAddr().String())
+	logging.Info(s.SessionId, "RemoteAddr:", s.Conn.RemoteAddr().String())
 
 	// send hande shake packet
 	pkt := proto.DefaultHandShakePacket(s.ConnId)
 	pktBuf, err = pkt.Write(s.SequenceId)
 	if err != nil {
 		defer s.Conn.Close()
-		fmt.Printf("format packet to bytes error: %s\n", err.Error())
+		logging.Error(s.SessionId, "format packet to bytes error:", err)
 	}
 	written, err = s.Conn.Write(pktBuf)
-	fmt.Printf("send handshake pkt: %x\n", pktBuf)
+	logging.Debugf("%v send handshake pkt: %x", s.SessionId, pktBuf)
 	if err != nil || written != len(pktBuf) {
-		defer s.Conn.Close()
-		fmt.Printf("send hand shake pkt error: %s\n", err.Error())
+		logging.Error(s.SessionId, "send hand shake pkt error:", err)
+		s.Conn.Close()
+		return
 	}
 
 	// recv auth packet
@@ -90,11 +94,11 @@ func (s *Session) HandleClient() {
 		}
 		s.SequenceId = p.SequenceId + 1
 		if authBuf, _ := proto.WritePacket(p.Buf, p.SequenceId); len(authBuf) > 0 {
-			fmt.Printf("recv auth pkt: %x\n", authBuf)
+			logging.Debugf("%v recv auth pkt: %x", s.SessionId, authBuf)
 		}
 		pktBuf, err = proto.DefaultOkPacket().Write(s.SequenceId)
 		s.Conn.Write(pktBuf)
-		fmt.Printf("send auth ok pkt: %x\n", pktBuf)
+		logging.Debugf("%v send auth ok pkt: %x", s.SessionId, pktBuf)
 		break
 	}
 
@@ -104,6 +108,9 @@ func (s *Session) HandleClient() {
 
 func (s *Session) DoCommand() {
 
+	defer func() {
+		logging.Info(s.SessionId, "DoCommand Finished")
+	}()
 	for {
 		p, err := s.readPacket()
 
@@ -113,21 +120,21 @@ func (s *Session) DoCommand() {
 		}
 
 		if err != nil {
-			fmt.Printf("recv client pkt error: %s\n", err.Error())
-			break
+			logging.Error(s.SessionId, "recv client pkt error:", err)
+			return
 		}
 
 		pBuf, _ := proto.WritePacket(p.Buf, p.SequenceId)
 
 		// sequence increment
 		s.SequenceId = p.SequenceId + 1
-		fmt.Printf("recv client pkt : %x\n", pBuf)
+		logging.Debugf("%v recv client pkt : %x", s.SessionId, pBuf)
 		comType := p.Buf[0]
 		supported, ok := proto.ComSupported[comType]
 
 		// Command does not supported
 		if !ok || !supported {
-			fmt.Printf("Command Type is Not Supported")
+			logging.Error(s.SessionId, "Command Type is Not Supported")
 			pBuf, _ = proto.DefaultErrorPacket("Command Not Supported").Write(s.SequenceId)
 			s.Conn.Write(pBuf)
 			continue
@@ -148,13 +155,13 @@ func (s *Session) DoCommand() {
 		case proto.ComDropDB:
 			s.doComDropDB(p)
 		}
-		fmt.Printf("DoCommand Finished.\n")
+
 	}
 }
 
 // To fix issue: https://github.com/openinx/muker/issues/1
 func (s *Session) doComQuit(p *proto.Packet) {
-	fmt.Printf("Command Quit\n")
+	logging.Info(s.SessionId, "Command Quit")
 	s.Conn.Close()
 }
 
@@ -179,27 +186,28 @@ func (s *Session) doComDropDB(p *proto.Packet) {
 }
 
 func (s *Session) doInnerCommand(comName string, p *proto.Packet) {
+	defer logging.Info(s.SessionId, "do command ", comName, " end")
 	query := p.Buf[1:]
-	fmt.Printf("Command %s: %s\n", comName, query)
+	logging.Debugf("%s Command %s: %s", s.SessionId, comName, query)
 
 	c, err := s.Backends.Get()
 	if err != nil {
-		fmt.Printf("Get Conn Error: %s\n", err.Error())
+		logging.Error(s.SessionId, "Get Conn Error:", err)
 	}
 
 	// reuse conn, put back to backend connection pool.
 	defer func() {
 		err = s.Backends.Put(c)
 		if err != nil {
-			fmt.Printf("Put back to conn pool failed: %v", err)
+			logging.Error(s.SessionId, "Put back to conn pool failed:", err)
 		}
 	}()
 
-	fmt.Printf("Connect to backend Client Sucessful.\n")
+	logging.Debug(s.SessionId, "Connect to backend Client Sucessful.")
 
 	err2 := c.WriteCommandPacket(p, s.Conn)
 	if err2 != nil {
-		fmt.Printf("Error: %s\n", err2.Error())
+		logging.Error(s.SessionId, "Error: ", err2)
 	}
-	fmt.Printf("do command %s end.\n", comName)
+
 }

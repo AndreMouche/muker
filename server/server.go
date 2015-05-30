@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/AndreMouche/logging"
 	"github.com/openinx/muker/pools"
 	"net"
 	"sync"
@@ -20,7 +21,8 @@ func DefaultProxyServer() *ProxyServer {
 	// Initialize 50 conn pools
 	backends, err := pools.NewConnPool(50)
 	if err != nil {
-		fmt.Printf("open backend connection pool failed: %v", err)
+		logging.Error("open backend connection pool failed:", err)
+		return nil
 	}
 
 	return &ProxyServer{
@@ -35,10 +37,12 @@ func DefaultProxyServer() *ProxyServer {
 func (p *ProxyServer) Start() {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
 	if err != nil {
-		fmt.Printf("Listen %s:%d failed\n", p.Host, p.Port)
+		logging.Error(err)
+		//panic(err)
+		return
 	}
 
-	fmt.Printf("Listen %s:%d ...\n", p.Host, p.Port)
+	logging.Infof("Listen %s:%d ...", p.Host, p.Port)
 
 	defer ln.Close()
 
